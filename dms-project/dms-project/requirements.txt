@@ -1,0 +1,14 @@
+# Driver Monitoring System — dependencies
+# Install with: pip install -r requirements.txt
+
+# Core computer vision
+opencv-python>=4.8.0       # frame capture, drawing, display
+
+# Facial landmark detection
+mediapipe==0.10.14           # FaceMesh — 468 3D facial landmarks
+
+# Numerical processing
+numpy>=1.24.0               # array ops, median, std, clip
+
+# Object detection (phone usage)
+ultralytics>=8.0.0          # YOLOv8 — phone detection model
