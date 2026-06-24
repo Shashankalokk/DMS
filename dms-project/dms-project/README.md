@@ -27,13 +27,14 @@ what each module does and how data flows between them.
 
 ```
 .
-├── main.py             # Entry point — wires everything together
+├── main.py             # Entry point — startup menu + wires everything together
 ├── config.py           # All tunable thresholds and constants
 ├── landmarks.py         # MediaPipe face landmark extraction + geometry
 ├── calibration.py       # Per-driver threshold calibration (video or live)
 ├── detection.py         # Frame-by-frame detection state machine
 ├── yolo_detection.py     # YOLOv8 phone-detection wrapper
 ├── display.py           # All on-screen drawing (HUD, warnings, boxes)
+├── calib_videos/         # Auto-created — stores recorded calibration sessions
 ├── README.md
 └── NAVIGATION.md
 ```
@@ -76,30 +77,60 @@ files over 100MB).
 
 ## Running it
 
-### Option 1 — Calibrate live, every time
+Just run:
 
 ```bash
 python main.py
 ```
 
-This opens your webcam and walks you through a 3-step interactive
-calibration (open eyes, blink, head pose), then starts live detection.
+You'll be asked how to calibrate **before any window opens**:
 
-### Option 2 — Calibrate from a pre-recorded video
+```
+==================================================
+  DRIVER MONITORING SYSTEM
+==================================================
 
-```bash
-python main.py path/to/calibration_clip.mp4
+  How would you like to calibrate?
+
+  [1]  Live camera  (records session for future use)
+  [2]  Video file   (pick from saved calibration videos)
+
+  Enter 1 or 2:
 ```
 
-Use a short clip (~20–30s) of the driver sitting normally and looking at
-the road. The system silently calibrates from it, then opens the webcam
-for live detection — no interaction needed for calibration.
+### Option 1 — Live camera
 
-You can also hardcode a path instead of passing it as a CLI argument —
-see the `CALIBRATION_VIDEO` variable near the top of `main.py`.
+Opens your webcam and walks you through a 3-step interactive calibration
+(open eyes, blink, head pose). The entire calibration session is
+automatically recorded to `calib_videos/calib_<timestamp>.mp4` as it
+happens — no extra steps needed. You can reuse that recording next time
+instead of recalibrating live.
 
-If video calibration fails for any reason (file not found, too few frames
-with a face, etc.), it automatically falls back to live calibration.
+### Option 2 — Video file
+
+Lists every video found in `calib_videos/`, with file size and save date,
+so you can pick one by number:
+
+```
+  Calibration videos in 'calib_videos/':
+
+  [1]  calib_20260615_143022.mp4  (12.4 MB, saved 2026-06-15 14:30)
+  [2]  calib_20260614_091500.mp4  (9.1 MB, saved 2026-06-14 09:15)
+
+  Enter number (1-2):
+```
+
+The system calibrates silently from the chosen file, then opens the
+webcam for live detection.
+
+**Fallback behavior:** if `calib_videos/` is empty, or the chosen video
+fails to calibrate (file not found, too few frames with a face, etc.),
+it automatically falls back to live camera calibration.
+
+**Orientation note:** recordings are saved already mirrored, matching
+exactly what you see on screen during live calibration. This means a
+recorded session played back through Option 2 calibrates the same way
+the live session did — looking left stays looking left.
 
 ### Controls
 
