@@ -43,7 +43,41 @@ modules in order every frame.
 ## File-by-file
 
 ### `main.py` — entry point
-Owns the main loop. Each iteration:
+
+**Startup flow** (before any detection loop runs):
+1. `prompt_calibration_choice()` shows a terminal menu — Live camera vs.
+   Video file. Runs **before** any OpenCV window is created, so nothing
+   visual appears until the user has answered.
+2. Based on the choice:
+   - **Live** → `do_live_calibration()` opens the camera, wraps it in
+     `RecordingCapture` (see below), runs the normal 3-phase interactive
+     calibration from `calibration.py`, and saves the session to
+     `calib_videos/calib_<timestamp>.mp4`.
+   - **Video** → `pick_video_from_directory()` lists every video file in
+     `calib_videos/` and lets the user pick one by number, then
+     `calibrate_from_video()` runs silently against it. Falls back to
+     live calibration if no videos exist or calibration fails.
+3. Only after calibration succeeds does `cv2.namedWindow(...)` actually
+   get used for the ready-splash and the main detection loop.
+
+**`RecordingCapture`** — a wrapper class around `cv2.VideoCapture`,
+needed because `cv2.VideoCapture`'s methods are C++-backed and read-only,
+so monkey-patching `.read()` directly raises `AttributeError`. The
+wrapper instead implements `.read()` itself and forwards every other
+attribute/method call to the real capture object via `__getattr__`, so
+`calibration.py` can't tell the difference.
+
+The important subtlety inside `.read()`: `calibrate_from_camera()` in
+`calibration.py` flips every frame itself (`cv2.flip(frame, 1)`) **after**
+calling `.read()`, for the on-screen mirror effect. `RecordingCapture`
+must therefore return the **raw, unflipped** frame to avoid a double-flip
+on screen — but it writes a **separately mirrored copy** to the video
+file, so that a later video-based calibration session (which does *not*
+flip on its own) sees the same orientation a live session would have.
+Get this wrong and "looking left" during recording calibrates as
+"looking right" during playback.
+
+**Main detection loop**, once calibration is done. Each iteration:
 1. Reads a frame from the camera
 2. Runs `yolo_detection.py` (only every `YOLO_SAMPLE_INTERVAL` frames)
 3. Runs `landmarks.py` to get face landmarks
@@ -53,12 +87,9 @@ Owns the main loop. Each iteration:
 6. Hands the result to `display.py` to draw everything
 7. Shows the frame, checks for ESC to exit
 
-Also owns calibration source selection (video file vs. live camera) at
-startup — see `CALIBRATION_VIDEO` and the CLI-argument handling near the
-top of `main()`.
-
 **Touch this file when:** changing the overall loop order, adding a new
-top-level feature, or changing how calibration is selected.
+top-level feature, changing how calibration is selected, or changing the
+startup menu's options.
 
 ---
 
@@ -223,3 +254,5 @@ visual element. Never add detection/threshold logic here — keep it in
 | Change calibration phase wording/timing | `calibration.py` |
 | Change what's shown on the HUD | `display.py` (`draw_hud`) |
 | Add a brand-new geometric signal from face landmarks | `landmarks.py` (new function + add to `get_all_metrics`), then wire it into `detection.py` |
+| Change the startup menu wording/options | `main.py` (`prompt_calibration_choice`) |
+| Change where calibration videos are saved/read from | `main.py` (`CALIB_VIDEO_DIR` constant near the top) |
